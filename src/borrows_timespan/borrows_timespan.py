@@ -1,1 +1,0 @@
-# Borrow timespan functions
