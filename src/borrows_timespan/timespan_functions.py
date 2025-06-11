@@ -7,7 +7,7 @@ import numpy as np
 def repayment(
     df_borrow_user,
     df_repay_user,
-    Threshold=True,
+    first_repay=True,
     col_amount="amount",
     col_cumsum="Cumsum_amount",
     col_user="onBehalfOf",
@@ -37,7 +37,7 @@ def repayment(
         pd.DataFrame: A table where each row maps a borrow to its corresponding covering repayment.
     """
     # Define prefix for repayment columns based on mode
-    prefix = "First" if Threshold else "Last"
+    prefix = "First" if first_repay else "Last"
 
     # If there are no repayments, return a DataFrame with NaNs for repayment fields
     if df_repay_user.empty:
@@ -79,9 +79,9 @@ def repayment(
         # For Threshold=False: find the last repayment
         threshold = (
             0
-            if index_borrow == 0 and Threshold
+            if index_borrow == 0 and first_repay
             else borrow_cumsum[index_borrow - 1]
-            if Threshold
+            if first_repay
             else borrow_cumsum[index_borrow]
         )
 
@@ -178,7 +178,7 @@ def first_last_repayment(
     first_repay = repayment(
         df_borrow_user,
         df_repay_user,
-        Threshold=True,
+        first_repay=True,
         col_amount=col_amount,
         col_cumsum=col_cumsum,
         col_user=col_user,
@@ -186,32 +186,12 @@ def first_last_repayment(
         col_day=col_day,
         col_block=col_block,
     )
-
-    # If missing first repayment: return full row with NaN
-    if first_repay.empty:
-        return pd.DataFrame(
-            {
-                "user": df_borrow_user[col_user].values,
-                "Reserve": df_borrow_user[col_asset].values,
-                "Borrow_Day": df_borrow_user[col_day].values,
-                "Borrow_blockNumber": df_borrow_user[col_block].values,
-                "Borrow_Amount": df_borrow_user[col_amount].values,
-                "First_Repay_Day": [pd.NaT] * len(df_borrow_user),
-                "First_Repay_blockNumber": [np.nan] * len(df_borrow_user),
-                "First_Repay_Amount": [np.nan] * len(df_borrow_user),
-                "Time_to_First_Repay": [pd.NaT] * len(df_borrow_user),
-                "Last_Repay_Day": [pd.NaT] * len(df_borrow_user),
-                "Last_Repay_blockNumber": [np.nan] * len(df_borrow_user),
-                "Last_Repay_Amount": [np.nan] * len(df_borrow_user),
-                "Time_to_Last_Repay": [pd.NaT] * len(df_borrow_user),
-            }
-        )
 
     # Compute the last repayment that fully covers each borrow
     last_repay = repayment(
         df_borrow_user,
         df_repay_user,
-        Threshold=False,
+        first_repay=False,
         col_amount=col_amount,
         col_cumsum=col_cumsum,
         col_user=col_user,
@@ -220,20 +200,26 @@ def first_last_repayment(
         col_block=col_block,
     )
 
-    # Reindex the last repayment DataFrame to match the length and index of first_repay
-    last_repay_aligned = last_repay.reindex(first_repay.index)
-
-    # Keep only relevant columns from last repayment info
     cols_to_add = [
         "Last_Repay_Day",
         "Last_Repay_blockNumber",
         "Last_Repay_Amount",
         "Time_to_Last_Repay",
     ]
-    last_repay_aligned = last_repay_aligned[cols_to_add]
 
-    # Concatenate first and last repayment information
-    df_repayment = pd.concat([first_repay, last_repay_aligned], axis=1)
+    # Merge first and last repayment information on the borrow keys
+    merge_keys = [
+        "user",
+        "Reserve",
+        "Borrow_Day",
+        "Borrow_blockNumber",
+        "Borrow_Amount",
+    ]
+
+    df_repayment = first_repay.merge(
+        last_repay[merge_keys + cols_to_add], on=merge_keys, how="inner"
+    )
+    assert len(df_repayment) == len(df_borrow_user)
 
     return df_repayment
 

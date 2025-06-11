@@ -1,13 +1,14 @@
 # Main ETL
-import sys
-import os
+
 from datetime import datetime
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "src/borrows_timespan"))
-
-import borrows_timespan as bt
-import event_funtion_extraction as event
-import standardisation as standard
+from src.borrows_timespan.timespan_functions import all_first_last_repayments
+from src.borrows_timespan.event_funtion_extraction import collect_events_data
+from src.borrows_timespan.standardisation import (
+    standardisation_borrow,
+    standardisation_repay,
+    rescaling_borrows,
+    rescaling_repay,
+)
 
 borrow = "borrow"
 repay = "repay"
@@ -18,17 +19,17 @@ start = datetime(2023, 1, 27)
 stop = datetime(2023, 2, 7)
 
 # Collect the data
-df_borrow = event.collect_events_data(event_type=borrow, start=start, stop=stop)
-df_repay = event.collect_events_data(event_type=repay, start=start, stop=stop)
+df_borrow = collect_events_data(event_type=borrow, start=start, stop=stop)
+df_repay = collect_events_data(event_type=repay, start=start, stop=stop)
 
 # Rename the assets
-df_borrow = standard.standardisation_borrow(df_borrow)
-df_repay = standard.standardisation_repay(df_repay)
+df_borrow = standardisation_borrow(df_borrow)
+df_repay = standardisation_repay(df_repay)
 
 # Rescale the amounts
-df_borrow = standard.rescaling_borrows(df_borrow)
-df_repay = standard.rescaling_repay(df_repay)
+df_borrow = rescaling_borrows(df_borrow)
+df_repay = rescaling_repay(df_repay)
 
 # Create the dataframe
-df = bt.all_first_last_repayments(df_borrow, df_repay)
+df = all_first_last_repayments(df_borrow, df_repay)
 print(df)
