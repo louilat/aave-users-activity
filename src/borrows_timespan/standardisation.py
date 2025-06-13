@@ -56,7 +56,7 @@ def rescaling_borrow(df_borrow, reserves):
     ]
     df_borrow = df_borrow[new_order_borrow]
     df_borrow["amount"].astype("float64")
-    df_borrow.groupby(
+    df_borrow = df_borrow.groupby(
         [
             "blockNumber",
             "reserve",
@@ -128,7 +128,7 @@ def rescaling_repay(df_repay, reserves):
     ]
     df_repay = df_repay[new_order_repay]
     df_repay["amount"].astype("float64")
-    df_repay.groupby(
+    df_repay = df_repay.groupby(
         [
             "blockNumber",
             "reserve",
@@ -141,5 +141,5 @@ def rescaling_repay(df_repay, reserves):
             "day",
         ],
         as_index=False,
-        ).sum({"amount": "sum"})
+    ).sum({"amount": "sum"})
     return df_repay

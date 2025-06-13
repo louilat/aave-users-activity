@@ -14,7 +14,7 @@ repay = "repay"
 # Define the time span
 # The first data available are on January 27th, 2023
 start = datetime(2023, 1, 27)
-stop = datetime(2023, 4, 1)
+stop = datetime(2023, 4, 30)
 
 # Collect the data
 df_borrow = collect_events_data(event_type=borrow, start=start, stop=stop)
