@@ -27,3 +27,5 @@ df_repay = rescaling_repay(df_repay, reserves)
 
 # Create the dataframe
 df = all_first_last_repayments(df_borrow, df_repay)
+
+df.to_csv("borrows_timespan_outputs.csv", index=False)
