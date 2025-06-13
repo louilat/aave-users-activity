@@ -52,10 +52,24 @@ def rescaling_borrow(df_borrow, reserves):
         "amount",
         "underlyingEventPriceUSD",
         "underlyingTokenPriceUSD",
-        "borrowRate",
         "day",
     ]
     df_borrow = df_borrow[new_order_borrow]
+    df_borrow["amount"].astype("float64")
+    df_borrow.groupby(
+        [
+            "blockNumber",
+            "reserve",
+            "name",
+            "decimals",
+            "onBehalfOf",
+            "user",
+            "underlyingEventPriceUSD",
+            "underlyingTokenPriceUSD",
+            "day",
+        ],
+        as_index=False,
+    ).sum({"amount": "sum"})
     return df_borrow
 
 
@@ -113,4 +127,19 @@ def rescaling_repay(df_repay, reserves):
         "day",
     ]
     df_repay = df_repay[new_order_repay]
+    df_repay["amount"].astype("float64")
+    df_repay.groupby(
+        [
+            "blockNumber",
+            "reserve",
+            "name",
+            "decimals",
+            "user",
+            "repayer",
+            "underlyingEventPriceUSD",
+            "underlyingTokenPriceUSD",
+            "day",
+        ],
+        as_index=False,
+        ).sum({"amount": "sum"})
     return df_repay

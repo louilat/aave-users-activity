@@ -235,6 +235,7 @@ def first_last_repayment(
     df_repayment = first_repay.merge(
         last_repay[merge_keys + cols_to_add], on=merge_keys, how="inner"
     )
+    print(df_repayment)
     assert len(df_repayment) == len(df_borrow_user)
 
     return df_repayment
