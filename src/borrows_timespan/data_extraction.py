@@ -32,7 +32,7 @@ def collect_events_data(event_type: str, start: datetime, stop: datetime) -> Dat
         day_events["day"] = day
         events = pd.concat((events, day_events))
         day += timedelta(days=1)
-    return events
+    return events.drop_duplicates()
 
 
 def collect_reserves_data(start: datetime, stop: datetime) -> DataFrame:
