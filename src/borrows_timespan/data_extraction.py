@@ -60,3 +60,30 @@ def collect_reserves_data(start: datetime, stop: datetime) -> DataFrame:
         reserves = pd.concat((reserves, day_reserves))
         day += timedelta(days=1)
     return reserves
+
+
+def collect_prices_data(start: datetime, stop: datetime) -> DataFrame:
+    """
+    Collect the pool-level data from the api endpoint for a given time interval.
+    Args:
+        start (datetime): The date at which the data collection starts.
+        stop (datetime): The date at which the data collection stops (stop NOT included).
+    Returns:
+        DataFrame: The dataframe with the ETH prices data over the interval.
+    """
+    prices = DataFrame()
+    day = start
+    while day <= stop:
+        print(f"Retrieving prices data for {day}")
+        month = day.ctime()[4:7]
+        day_str = "-".join([day.strftime("%Y"), month, day.strftime("%d")])
+        resp = requests.get(
+            url="https://aavefulldata.lab.groupe-genes.fr/prices",
+            params={"date": day_str},
+            verify=False,
+        )
+        day_reserves = pd.json_normalize(resp.json())
+        day_reserves["day"] = day
+        prices = pd.concat((prices, day_reserves))
+        day += timedelta(days=1)
+    return prices
