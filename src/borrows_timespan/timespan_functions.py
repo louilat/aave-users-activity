@@ -128,7 +128,7 @@ def repayment(
                     f"{prefix}_Repay_Day": pd.NaT,
                     f"{prefix}_Repay_blockNumber": np.nan,
                     f"{prefix}_Repay_Amount": np.nan,
-                    f"{prefix}_Repay_Amount_USD": [np.nan] * len(df_borrow_user),
+                    f"{prefix}_Repay_Amount_USD": np.nan,
                     f"Time_to_{prefix}_Repay": pd.NaT,
                 }
             )
@@ -241,9 +241,8 @@ def first_last_repayment(
 
 
 def first_last_repayments_by_user(
-    df_borrow,
-    df_repay,
-    user,
+    df_borrow_user,
+    df_repay_user,
     col_amount="amount",
     col_user_borrow="onBehalfOf",
     col_user_repay="user",
@@ -253,7 +252,7 @@ def first_last_repayments_by_user(
     col_USD="underlyingEventPriceUSD",
 ):
     """
-    Computes first and last repayment matches for a given user across all assets the user interacted with.
+    Computes first and last repayment matches for a given user across all assets the user borrowed with.
 
     For each asset borrowed and repaid by the user, this function:
     - Filters relevant borrow and repay transactions
@@ -264,11 +263,9 @@ def first_last_repayments_by_user(
     Parameters:
     ----------
     df_borrow_user : pd.DataFrame
-        The borrow transactions filtered for a specific user or asset.
+        The borrow transactions of a user.
     df_repay_user : pd.DataFrame
-        The repayment transactions filtered for the same user or asset.
-    user : str
-        The label of the user.
+        The repayment transactions of a user.
     col_amount : str
         Column name for transaction amount.
     col_cumsum : str
@@ -289,22 +286,18 @@ def first_last_repayments_by_user(
     DataFrame with first and last repayment info for each borrow. Missing values are filled with NaN.
     """
 
-    # Filter user-specific borrow and repay transactions
-    borrow = df_borrow[df_borrow[col_user_borrow] == user].copy()
-    repay = df_repay[df_repay[col_user_repay] == user].copy()
-
     # Identify shared assets between borrow and repay
-    assets = borrow[col_asset].unique()
+    assets = df_borrow_user[col_asset].unique()
     all_results = []  # List of DataFrames to concatenate
 
     for asset in assets:
         # Select relevant borrow and repay events for the asset
-        df_borrow_user = borrow[borrow[col_asset] == asset][
+        df_borrow_user = df_borrow_user[df_borrow_user[col_asset] == asset][
             [col_user_borrow, col_day, col_asset, col_amount, col_USD, col_block]
         ].copy()
         df_borrow_user["Cumsum_amount"] = df_borrow_user[col_amount].cumsum()
 
-        df_repay_user = repay[repay[col_asset] == asset][
+        df_repay_user = df_repay_user[df_repay_user[col_asset] == asset][
             [col_user_repay, col_day, col_asset, col_amount, col_USD, col_block]
         ].copy()
         df_repay_user["Cumsum_amount"] = df_repay_user[col_amount].cumsum()
@@ -375,14 +368,16 @@ def all_first_last_repayments(
     -------
     DataFrame with first and last repayment info for each borrow. Missing values are filled with NaN.
     """
-
     users = df_borrow[col_user_borrow].unique()
     all_df = []
     for user in users:
+        # Filter user-specific borrow and repay transactions
+        borrow = df_borrow[df_borrow[col_user_borrow] == user].copy()
+        repay = df_repay[df_repay[col_user_repay] == user].copy()
+
         df_user = first_last_repayments_by_user(
-            df_borrow,
-            df_repay,
-            f"{user}",
+            borrow,
+            repay,
             col_amount=col_amount,
             col_user_borrow=col_user_borrow,
             col_user_repay=col_user_repay,
