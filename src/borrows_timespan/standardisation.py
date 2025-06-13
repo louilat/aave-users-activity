@@ -32,7 +32,7 @@ def rescaling_borrow(df_borrow, reserves):
     )
 
     # Rescale the values of transactions
-    df_borrow["amount"] = (df_borrow["amount"] / (10 ** df_borrow["decimals"])).round(6)
+    df_borrow["amount"] = (df_borrow["amount"] / (10 ** df_borrow["decimals"])).astype(float).round(6)
 
     # Calculate the USD price of the borrow
     df_borrow["underlyingEventPriceUSD"] = (
@@ -87,7 +87,7 @@ def rescaling_repay(df_repay, reserves):
     )
 
     # Rescale the values of transactions
-    df_repay["amount"] = (df_repay["amount"] / (10 ** df_repay["decimals"])).round(6)
+    df_repay["amount"] = (df_repay["amount"] / (10 ** df_repay["decimals"])).astype(float).round(6)
 
     # Calculate the USD price of the repay
     df_repay["underlyingEventPriceUSD"] = (
