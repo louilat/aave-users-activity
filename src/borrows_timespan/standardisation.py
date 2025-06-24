@@ -121,7 +121,7 @@ def rescaling_borrow(
     df_borrow = df_borrow[new_order_borrow]
 
     # Ensure that amount is float64
-    df_borrow[col_amount].astype("float64")
+    df_borrow[col_amount] = df_borrow[col_amount].astype("float64")
 
     # Group by unique borrow identifiers and sum amounts in case of duplicates
     df_borrow = df_borrow.groupby(
@@ -223,7 +223,7 @@ def rescaling_repay(
     df_repay = df_repay[new_order_repay]
 
     # Ensure that amount is float64
-    df_repay = df_repay[col_amount].astype("float64")
+    df_repay[col_amount] = df_repay[col_amount].astype("float64")
 
     # Group by unique borrow identifiers and sum amounts in case of duplicates
     df_repay = df_repay.groupby(

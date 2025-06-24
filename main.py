@@ -23,7 +23,7 @@ df = all_first_last_repayments(df_borrow, df_repay)
 
 df = add_timestamp(
     df,
-    blocksTimestamps="data\\blocksTimestamps.json",
+    blocksTimestamps="data/blocksTimestamps.json",
     col_blockNumber_df_borrow="Borrow_blockNumber",
     col_day_borrow="Borrow_Day",
     col_blockNumber_df_first="First_Repay_blockNumber",
@@ -32,4 +32,4 @@ df = add_timestamp(
     col_day_last="Last_Repay_Day",
 )
 
-df.to_csv("borrows_timespan_outputs.csv", index=False)
+df.to_csv("data/borrows_timespan_outputs.csv", index=False)

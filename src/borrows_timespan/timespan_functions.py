@@ -5,13 +5,15 @@ import numpy as np
 from .data_extraction import (
     collect_events_data,
     collect_prices_data,
-    collect_reserves_data
+    collect_reserves_data,
 )
 from .standardisation import (
     generate_days,
     rescaling_borrow,
     rescaling_repay,
+    find_closest_price,
 )
+from datetime import datetime
 
 
 def repayment(
@@ -509,10 +511,10 @@ def collect_borrow_repay(start, stop):
     # Loop through each day between start and stop
     for day in generate_days(start=start, stop=stop):
         # Collect daily borrow and repay transactions
-        df_borrow = collect_events_data(event_type=borrow, start=day, stop=day)
-        df_repay = collect_events_data(event_type=repay, start=day, stop=day)
+        df_borrow = collect_events_data(event_type="borrow", start=day, stop=day)
+        df_repay = collect_events_data(event_type="repay", start=day, stop=day)
 
-        # Special case: skip price assignment for 2023-01-27, as the api does not have the value of for prices data
+        # Special case: skip price assignment for 2023-01-27, as the api does not have the value of prices data
         if day != datetime(2023, 1, 27):
             # Collect price data for the day
             prices = collect_prices_data(start=day, stop=day)
