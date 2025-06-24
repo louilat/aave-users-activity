@@ -474,7 +474,20 @@ def all_first_last_repayments(
         all_df.append(df_user)
 
     # Concatenate the results for all users
-    return pd.concat(all_df, axis=0, ignore_index=True)
+    df_all = pd.concat(all_df, axis=0, ignore_index=True)
+
+    # Ensure block number columns remain integer-typed while allowing for missing values (NaN)
+    for col in [
+        "Borrow_blockNumber",
+        "First_Repay_blockNumber",
+        "Last_Repay_blockNumber",
+    ]:
+        if col in df_all.columns:
+            df_all[col] = df_all[col].astype(
+                "Int64"
+            )  # use pandas nullable integer type
+
+    return df_all
 
 
 def collect_borrow_repay(start, stop):
