@@ -8,7 +8,10 @@ from src.borrows_timespan.timespan_functions import (
 from src.borrows_timespan.standardisation import (
     add_timestamp,
 )
-
+from src.borrows_timespan.data_extraction import (
+    get_user_transactions_sent,
+    get_user_transactions_received,
+)
 
 # Define the time span
 # The first data available are on January 27th, 2023
@@ -33,3 +36,20 @@ df = add_timestamp(
 )
 
 df.to_csv("data/borrows_timespan_outputs.csv", index=False)
+
+key = "YOUR_ALCHEMY_API_KEY"
+
+ALCHEMY_URL = f"https://eth-mainnet.g.alchemy.com/v2/{key}"
+
+tx_sent = get_user_transactions_sent(
+    ALCHEMY_URL=ALCHEMY_URL,
+    address=df["user"],
+    from_block=df["Borrow_blockNumber"],
+    to_block=df["First_Repay_blockNumber"],
+)
+tx_received = get_user_transactions_received(
+    ALCHEMY_URL=ALCHEMY_URL,
+    address=df["user"],
+    from_block=df["Borrow_blockNumber"],
+    to_block=df["Last_Repay_blockNumber"],
+)
