@@ -113,35 +113,45 @@ def repayment(
     borrow_event_price = df_borrow_user[col_event_price].values
 
     # Loop through each borrow transaction
-    for i in range(len(df_borrow_user)):
+    for index_borrow in range(len(df_borrow_user)):
         # Define the repayment threshold based on first/last setting
         threshold = (
             0
-            if i == 0 and first_repay
-            else borrow_cumsum[i - 1]
+            if index_borrow == 0 and first_repay
+            else borrow_cumsum[index_borrow - 1]
             if first_repay
-            else borrow_cumsum[i]
+            else borrow_cumsum[index_borrow]
         )
 
         # Search for the repayment that matches the threshold
-        for j in range(len(df_repay_user)):
-            if repay_block[j] >= borrow_block[i] and repay_cumsum[j] > threshold:
+        for index_repay in range(len(df_repay_user)):
+            if (
+                repay_block[index_repay] >= borrow_block[index_borrow]
+                and repay_cumsum[index_repay] > threshold
+            ):
                 # Match found: append enriched borrow-repay pair
                 results.append(
                     {
-                        "user": borrow_user[i],
-                        "Reserve": borrow_asset[i],
-                        "Borrow_Day": borrow_day[i],
-                        "Borrow_blockNumber": borrow_block[i],
-                        "Borrow_Amount": borrow_amount[i],
-                        "Borrow_underlyingTokenPriceUSD": borrow_price[i],
-                        "Borrow_underlyingEventPriceUSD": borrow_event_price[i],
-                        f"{prefix}_Repay_Day": repay_day[j],
-                        f"{prefix}_Repay_blockNumber": repay_block[j],
-                        f"{prefix}_Repay_Amount": repay_amount[j],
-                        f"{prefix}_Repay_underlyingTokenPriceUSD": repay_price[j],
-                        f"{prefix}_Repay_underlyingEventPriceUSD": repay_event_price[j],
-                        f"Time_to_{prefix}_Repay": repay_day[j] - borrow_day[i],
+                        "user": borrow_user[index_borrow],
+                        "Reserve": borrow_asset[index_borrow],
+                        "Borrow_Day": borrow_day[index_borrow],
+                        "Borrow_blockNumber": borrow_block[index_borrow],
+                        "Borrow_Amount": borrow_amount[index_borrow],
+                        "Borrow_underlyingTokenPriceUSD": borrow_price[index_borrow],
+                        "Borrow_underlyingEventPriceUSD": borrow_event_price[
+                            index_borrow
+                        ],
+                        f"{prefix}_Repay_Day": repay_day[index_repay],
+                        f"{prefix}_Repay_blockNumber": repay_block[index_repay],
+                        f"{prefix}_Repay_Amount": repay_amount[index_repay],
+                        f"{prefix}_Repay_underlyingTokenPriceUSD": repay_price[
+                            index_repay
+                        ],
+                        f"{prefix}_Repay_underlyingEventPriceUSD": repay_event_price[
+                            index_repay
+                        ],
+                        f"Time_to_{prefix}_Repay": repay_day[index_repay]
+                        - borrow_day[index_borrow],
                     }
                 )
                 break  # Stop once the first match is found
@@ -149,13 +159,13 @@ def repayment(
             # No repayment match found: fill with NaNs
             results.append(
                 {
-                    "user": borrow_user[i],
-                    "Reserve": borrow_asset[i],
-                    "Borrow_Day": borrow_day[i],
-                    "Borrow_blockNumber": borrow_block[i],
-                    "Borrow_Amount": borrow_amount[i],
-                    "Borrow_underlyingTokenPriceUSD": borrow_price[i],
-                    "Borrow_underlyingEventPriceUSD": borrow_event_price[i],
+                    "user": borrow_user[index_borrow],
+                    "Reserve": borrow_asset[index_borrow],
+                    "Borrow_Day": borrow_day[index_borrow],
+                    "Borrow_blockNumber": borrow_block[index_borrow],
+                    "Borrow_Amount": borrow_amount[index_borrow],
+                    "Borrow_underlyingTokenPriceUSD": borrow_price[index_borrow],
+                    "Borrow_underlyingEventPriceUSD": borrow_event_price[index_borrow],
                     f"{prefix}_Repay_Day": pd.NaT,
                     f"{prefix}_Repay_blockNumber": np.nan,
                     f"{prefix}_Repay_Amount": np.nan,
@@ -617,6 +627,15 @@ def collect_borrow_repay(start, stop):
     # Rescale the amounts
     df_borrow_all = rescaling_borrow(df_borrow_all)
     df_repay_all = rescaling_repay(df_repay_all)
+
+    # np.nan in the df changed the type of blockNumber's column from int into float
+    for col in [
+        "Borrow_blockNumber",
+        "First_Repay_blockNumber",
+        "Last_Repay_blockNumber",
+    ]:
+        df_borrow_all[col] = df_borrow_all[col].astype("Int64")
+        df_repay_all[col] = df_repay_all[col].astype("Int64")
 
     # Return cleaned and enriched datasets
     return df_borrow_all, df_repay_all

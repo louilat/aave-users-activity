@@ -91,91 +91,7 @@ def collect_prices_data(start: datetime, stop: datetime) -> DataFrame:
     return prices
 
 
-def get_user_transactions_sent(ALCHEMY_URL, address, from_block, to_block):
-    """
-    Retrieves and processes all asset transfers sent from an address between two block numbers.
-
-    Parameters:
-    -----------
-    address : str
-        Ethereum address to track.
-    from_block : int
-        Start block number (inclusive).
-    to_block : int
-        End block number (inclusive).
-
-    Returns:
-    --------
-    pd.DataFrame
-        Cleaned and formatted DataFrame of sent asset transfers.
-    """
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "alchemy_getAssetTransfers",
-        "params": [
-            {
-                "fromBlock": hex(from_block),
-                "toBlock": hex(to_block),
-                "fromAddress": address.lower(),  # Sent only
-                "category": ["erc20"],
-                "withMetadata": True,
-                "maxCount": "0x3e8",
-            }
-        ],
-    }
-
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(ALCHEMY_URL, data=json.dumps(payload), headers=headers)
-
-    if not response.ok:
-        print(f"Error (sent) for {address}: {response.status_code}")
-        return pd.DataFrame()
-
-    # Define columns
-    columns = [
-        "uniqueId",
-        "hash",
-        "blockNum",
-        "from",
-        "to",
-        "rawContract.address",
-        "asset",
-        "value",
-        "rawContract.decimal",
-        "category",
-        "metadata.blockTimestamp",
-    ]
-
-    # Normalize JSON response into flat DataFrame
-    tx_sent = pd.json_normalize(response.json()["result"]["transfers"])[columns]
-
-    # Rename relevant columns
-    tx_sent.rename(
-        columns={
-            "hash": "tx_hash",
-            "uniqueId": "event_id",
-            "blockNum": "blockNumber",
-            "metadata.blockTimestamp": "timestamp",
-            "rawContract.decimal": "decimals",
-            "rawContract.address": "reserve",
-        },
-        inplace=True,
-    )
-
-    # Format timestamp as datetime (remove timezone)
-    tx_sent["timestamp"] = pd.to_datetime(tx_sent["timestamp"]).dt.tz_localize(None)
-
-    # Convert hex fields to integers
-    tx_sent["blockNumber"] = tx_sent["blockNumber"].apply(lambda x: int(x, 16))
-    tx_sent["decimals"] = tx_sent["decimals"].apply(
-        lambda x: int(x, 16) if pd.notnull(x) else np.nan
-    )
-
-    return tx_sent
-
-
-def get_user_transactions_received(ALCHEMY_URL, address, from_block, to_block):
+def get_user_transactions(alchemy_url, address, from_block, to_block, from_user=True):
     """
     Retrieves and processes all asset transfers received by an address between two block numbers.
 
@@ -187,33 +103,41 @@ def get_user_transactions_received(ALCHEMY_URL, address, from_block, to_block):
         Start block number (inclusive).
     to_block : int
         End block number (inclusive).
+    from_user : bool
+        Determine whether we collect the transactions sent or received
 
     Returns:
     --------
     pd.DataFrame
         Cleaned and formatted DataFrame of received asset transfers.
     """
+    # Build base params dict
+    params_dict = {
+        "fromBlock": hex(from_block),
+        "toBlock": hex(to_block),
+        "category": ["erc20"],
+        "withMetadata": True,
+        "maxCount": "0x3e8",
+    }
+
+    # Specify fromAddress or toAddress in the params dict
+    if from_user:
+        params_dict["fromAddress"] = address.lower()
+    else:
+        params_dict["toAddress"] = address.lower()
+
     payload = {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "alchemy_getAssetTransfers",
-        "params": [
-            {
-                "fromBlock": hex(from_block),
-                "toBlock": hex(to_block),
-                "toAddress": address.lower(),  # Received only
-                "category": ["erc20"],
-                "withMetadata": True,
-                "maxCount": "0x3e8",
-            }
-        ],
+        "params": [params_dict],
     }
 
     headers = {"Content-Type": "application/json"}
-    response = requests.post(ALCHEMY_URL, data=json.dumps(payload), headers=headers)
+    response = requests.post(alchemy_url, data=json.dumps(payload), headers=headers)
 
     if not response.ok:
-        print(f"Error (received) for {address}: {response.status_code}")
+        print(f"Error for {address}: {response.status_code}")
         return pd.DataFrame()
 
     # Define columns
@@ -232,10 +156,10 @@ def get_user_transactions_received(ALCHEMY_URL, address, from_block, to_block):
     ]
 
     # Normalize JSON response into flat DataFrame
-    tx_received = pd.json_normalize(response.json()["result"]["transfers"])[columns]
+    tx = pd.json_normalize(response.json()["result"]["transfers"])[columns]
 
     # Rename relevant columns
-    tx_received.rename(
+    tx.rename(
         columns={
             "hash": "tx_hash",
             "uniqueId": "event_id",
@@ -248,14 +172,118 @@ def get_user_transactions_received(ALCHEMY_URL, address, from_block, to_block):
     )
 
     # Format timestamp as datetime (remove timezone)
-    tx_received["timestamp"] = pd.to_datetime(tx_received["timestamp"]).dt.tz_localize(
-        None
-    )
+    tx["timestamp"] = pd.to_datetime(tx["timestamp"]).dt.tz_localize(None)
 
     # Convert hex fields to integers
-    tx_received["blockNumber"] = tx_received["blockNumber"].apply(lambda x: int(x, 16))
-    tx_received["decimals"] = tx_received["decimals"].apply(
+    tx["blockNumber"] = tx["blockNumber"].apply(lambda x: int(x, 16))
+    tx["decimals"] = tx["decimals"].apply(
         lambda x: int(x, 16) if pd.notnull(x) else np.nan
     )
 
-    return tx_received
+    return tx
+
+
+def extract_user_transactions(df, alchemy_url):
+    """
+    Extracts and enriches sent and received transactions for a list of users.
+
+    Args:
+        df (pd.DataFrame): A DataFrame containing the following columns:
+            - user
+            - Reserve
+            - Borrow_Amount
+            - Borrow_underlyingEventPriceUSD
+            - First_Repay_Amount
+            - Borrow_blockNumber
+            - First_Repay_blockNumber
+
+    Returns:
+        pd.DataFrame: A combined DataFrame with enriched transactions sorted by block number.
+    """
+    tx = []
+    all_sent = []
+    all_received = []
+
+    for row in df.itertuples(index=False):
+        # Retrieve sent and received transactions
+        tx_sent = get_user_transactions(
+            alchemy_url=alchemy_url,
+            address=row.user,
+            from_block=row.Borrow_blockNumber,
+            to_block=row.Last_Repay_blockNumber,
+            from_user=True,
+        )
+        tx_received = get_user_transactions(
+            alchemy_url=alchemy_url,
+            address=row.user,
+            from_block=row.Borrow_blockNumber,
+            to_block=row.Last_Repay_blockNumber,
+            from_user=False,
+        )
+
+        # Store user transactions along with metadata
+        tx.append(
+            {
+                "user": row.user,
+                "Borrowed_Asset": row.Reserve,
+                "Borrow_Amount": row.Borrow_Amount,
+                "Borrow_Amount_USD": row.Borrow_underlyingEventPriceUSD,
+                "First_Repay_Amount": row.First_Repay_Amount,
+                "First_Repay_blockNumber": row.First_Repay_blockNumber,
+                "sent": tx_sent.to_dict(orient="records"),
+                "received": tx_received.to_dict(orient="records"),
+            }
+        )
+
+    # Flatten and enrich the transactions
+    for entry in tx:
+        for sent in entry["sent"]:
+            sent.update(
+                {
+                    "user": entry["user"],
+                    "Borrowed_Asset": entry["Borrowed_Asset"],
+                    "Borrow_Amount": entry["Borrow_Amount"],
+                    "Borrow_Amount_USD": entry["Borrow_Amount_USD"],
+                    "First_Repay_Amount": entry["First_Repay_Amount"],
+                    "First_Repay_blockNumber": entry["First_Repay_blockNumber"],
+                    "direction": "sent",
+                }
+            )
+            all_sent.append(sent)
+
+        for received in entry["received"]:
+            received.update(
+                {
+                    "user": entry["user"],
+                    "Borrowed_Asset": entry["Borrowed_Asset"],
+                    "Borrow_Amount": entry["Borrow_Amount"],
+                    "Borrow_Amount_USD": entry["Borrow_Amount_USD"],
+                    "First_Repay_Amount": entry["First_Repay_Amount"],
+                    "First_Repay_blockNumber": entry["First_Repay_blockNumber"],
+                    "direction": "received",
+                }
+            )
+            all_received.append(received)
+
+    # Create the final DataFrame
+    df_tx = pd.DataFrame(all_sent + all_received)
+
+    # Reorder columns to put key fields in front
+    cols = df_tx.columns.tolist()
+    for col in [
+        "First_Repay_blockNumber",
+        "First_Repay_Amount",
+        "Borrow_Amount_USD",
+        "Borrow_Amount",
+        "Borrowed_Asset",
+        "user",
+    ]:
+        if col in cols:
+            cols.insert(0, cols.pop(cols.index(col)))
+    df_tx = df_tx[cols]
+
+    # Sort and clean
+    df_tx.sort_values(by="blockNumber", inplace=True)
+    df_tx = df_tx.dropna(subset=["asset"])
+
+    return df_tx

@@ -61,8 +61,7 @@ def rescaling_borrow(
     col_day="day",
 ):
     """
-    Function that merge the dataframe of borrows and of reserves to get the underlying price in USD and the decimals
-    necessary to rescale the amounts.
+    Function that rescale the amounts of borrow events.
 
     Parameters:
     -----------
@@ -159,8 +158,7 @@ def rescaling_repay(
     col_day="day",
 ):
     """
-    Function that merge the dataframe of borrows and of reserves to get the underlying price in USD and the decimals
-    necessary to rescale the amounts.
+    Function that rescale the amounts of repay events.
 
     Parameters:
     -----------
@@ -253,9 +251,9 @@ def add_timestamp(
     mode="r",
     col_timestamp="timestamp",
     col_blockNumber_timestamp="blockNumber",
-    col_blockNumber_df_borrow=None,
-    col_blockNumber_df_first=None,
-    col_blockNumber_df_last=None,
+    col_blockNumber_borrow=None,
+    col_blockNumber_first=None,
+    col_blockNumber_last=None,
     col_day_borrow=None,
     col_day_first=None,
     col_day_last=None,
@@ -276,11 +274,11 @@ def add_timestamp(
         Name of the timestamp field in the JSON file.
     col_blockNumber_timestamp : str, optional
         Name of the blockNumber field in the JSON file.
-    col_blockNumber_df_borrow : str, optional
+    col_blockNumber_borrow : str, optional
         Column name in df containing borrow block numbers.
-    col_blockNumber_df_first : str, optional
+    col_blockNumber_first : str, optional
         Column name in df containing first repay block numbers.
-    col_blockNumber_df_last : str, optional
+    col_blockNumber_last : str, optional
         Column name in df containing last repay block numbers.
     col_day_borrow : str, optional
         Name of the output column for borrow timestamps.
@@ -315,16 +313,16 @@ def add_timestamp(
     )
 
     # Apply mapping for borrow if column specified
-    if col_blockNumber_df_borrow and col_day_borrow:
-        df[col_day_borrow] = df[col_blockNumber_df_borrow].map(block_to_timestamp)
+    if col_blockNumber_borrow and col_day_borrow:
+        df[col_day_borrow] = df[col_blockNumber_borrow].map(block_to_timestamp)
 
     # Apply mapping for first repayment if column specified
-    if col_blockNumber_df_first and col_day_first:
-        df[col_day_first] = df[col_blockNumber_df_first].map(block_to_timestamp)
+    if col_blockNumber_first and col_day_first:
+        df[col_day_first] = df[col_blockNumber_first].map(block_to_timestamp)
         df["Time_to_First_Repay"] = df[col_day_first] - df[col_day_borrow]
     # Apply mapping for last repayment if column specified
-    if col_blockNumber_df_last and col_day_last:
-        df[col_day_last] = df[col_blockNumber_df_last].map(block_to_timestamp)
+    if col_blockNumber_last and col_day_last:
+        df[col_day_last] = df[col_blockNumber_last].map(block_to_timestamp)
         df["Time_to_Last_Repay"] = df[col_day_last] - df[col_day_borrow]
 
     return df
