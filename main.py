@@ -7,6 +7,8 @@ from src.borrows_timespan.timespan_functions import (
 )
 from src.borrows_timespan.standardisation import (
     add_timestamp,
+    classify_addresses,
+    fetch_erc20_metadata,
 )
 from src.borrows_timespan.data_extraction import (
     extract_user_transactions,
@@ -34,10 +36,12 @@ df = add_timestamp(
     col_day_last="Last_Repay_Day",
 )
 
-df.to_csv("data/borrows_timespan_outputs.csv", index=False)
-
 key = "YOUR_ALCHEMY_API_KEY"
 
-ALCHEMY_URL = f"https://eth-mainnet.g.alchemy.com/v2/{key}"
+df = extract_user_transactions(df=df, alchemy_api_key=key)
 
-extract_user_transactions(df=df, alchemy_url=ALCHEMY_URL)
+df = classify_addresses(df=df, alchemy_api_key=key)
+
+df = fetch_erc20_metadata(df=df, alchemy_api_key=key)
+
+df.to_csv("data/df_tx.csv", index=False)

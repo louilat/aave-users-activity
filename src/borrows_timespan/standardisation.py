@@ -3,6 +3,8 @@ import pandas as pd
 from datetime import timedelta
 import numpy as np
 import json
+from web3 import Web3
+from hexbytes import HexBytes
 
 
 def generate_days(start, stop):
@@ -324,5 +326,162 @@ def add_timestamp(
     if col_blockNumber_last and col_day_last:
         df[col_day_last] = df[col_blockNumber_last].map(block_to_timestamp)
         df["Time_to_Last_Repay"] = df[col_day_last] - df[col_day_borrow]
+
+    return df
+
+
+def classify_addresses(df, alchemy_api_key):
+    """
+    Classify addresses in a transaction DataFrame as either 'Address', 'Contract', or 'Unknown'.
+
+    This function:
+    - Creates a new 'address' column depending on the transaction direction ('sent' or 'received').
+    - Queries the Ethereum blockchain to determine if each unique address is an EOA or a contract.
+    - Assigns the result to a 'type' column.
+
+    Args:
+        df (pd.DataFrame): The transaction DataFrame, must have 'from', 'to', and 'direction' columns.
+        alchemy_api_key (str): Your Alchemy API key.
+
+    Returns:
+        pd.DataFrame: The input DataFrame with added 'address' and 'type' columns.
+    """
+    alchemy_url = f"https://eth-mainnet.g.alchemy.com/v2/{alchemy_api_key}"
+    w3 = Web3(Web3.HTTPProvider(alchemy_url))
+
+    # Treatment of the case of the null address
+    zero_address = "0x0000000000000000000000000000000000000000"
+
+    # Replace 'from' if equal to zero address
+    df.loc[df["from"] == zero_address, "from"] = df.loc[
+        df["from"] == zero_address, "reserve"
+    ]
+
+    # Replace 'to' if equal to zero address
+    df.loc[df["to"] == zero_address, "to"] = df.loc[df["to"] == zero_address, "reserve"]
+
+    # Create the 'address' column based on direction
+    df["address"] = df.apply(
+        lambda row: row["to"] if row["direction"] == "sent" else row["from"], axis=1
+    )
+
+    # Build mapping of unique addresses to their type
+    address_types = {}
+    unique_addresses = df["address"].astype(str).unique()
+
+    for addr in unique_addresses:
+        try:
+            checksum_addr = w3.to_checksum_address(addr)
+            code = w3.eth.get_code(checksum_addr)
+            if code == HexBytes("0x"):
+                address_types[addr] = "Address"
+            else:
+                address_types[addr] = "Contract"
+        except Exception as e:
+            print(f"Error with address {addr}: {e}")
+            address_types[addr] = "Unknown"
+
+    # Map the classification back to the DataFrame
+    df["type"] = df["address"].map(address_types)
+
+    return df
+
+
+def fetch_erc20_metadata(df, alchemy_api_key):
+    """
+    Fetches ERC20 token metadata (symbol and name) for all contract addresses in a DataFrame.
+
+    This function:
+    - Initializes a Web3 instance from the provided Alchemy API key.
+    - Identifies unique contract addresses from the 'address' column where type == 'Contract'.
+    - Tries to query the ERC20 symbol and name using the standard string ABI.
+    - Falls back to the bytes32 ABI if needed.
+    - Maps the results back to the DataFrame in a 'contract_name' column.
+
+    Args:
+        df (pd.DataFrame): DataFrame with columns 'address' and 'type'.
+        alchemy_api_key (str): Your Alchemy API key.
+
+    Returns:
+        pd.DataFrame: The input DataFrame with an added 'contract_name' column.
+    """
+    ALCHEMY_URL = f"https://eth-mainnet.g.alchemy.com/v2/{alchemy_api_key}"
+    w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
+
+    ERC20_ABI = [
+        {
+            "constant": True,
+            "inputs": [],
+            "name": "symbol",
+            "outputs": [{"name": "", "type": "string"}],
+            "type": "function",
+        },
+        {
+            "constant": True,
+            "inputs": [],
+            "name": "name",
+            "outputs": [{"name": "", "type": "string"}],
+            "type": "function",
+        },
+    ]
+
+    ERC20_ABI_BYTES32 = [
+        {
+            "constant": True,
+            "inputs": [],
+            "name": "symbol",
+            "outputs": [{"name": "", "type": "bytes32"}],
+            "type": "function",
+        },
+        {
+            "constant": True,
+            "inputs": [],
+            "name": "name",
+            "outputs": [{"name": "", "type": "bytes32"}],
+            "type": "function",
+        },
+    ]
+
+    unique_addresses = df[df["type"] == "Contract"]["address"].dropna().unique()
+
+    token_metadata = {}
+
+    for addr in unique_addresses:
+        try:
+            addr_checksum = w3.to_checksum_address(addr)
+
+            # Skip if no bytecode (not really a contract)
+            if w3.eth.get_code(addr_checksum) == b"":
+                print(f"Skipping {addr} (no bytecode)")
+                continue
+
+            # Try standard ABI first
+            try:
+                contract = w3.eth.contract(address=addr_checksum, abi=ERC20_ABI)
+                symbol = contract.functions.symbol().call()
+                name = contract.functions.name().call()
+
+            except Exception:
+                # Fallback to bytes32 ABI
+                contract_bytes32 = w3.eth.contract(
+                    address=addr_checksum, abi=ERC20_ABI_BYTES32
+                )
+                symbol = contract_bytes32.functions.symbol().call()
+                name = contract_bytes32.functions.name().call()
+
+                # Decode bytes32 fields
+                if isinstance(symbol, bytes):
+                    symbol = symbol.decode("utf-8", errors="ignore").rstrip("\x00")
+                if isinstance(name, bytes):
+                    name = name.decode("utf-8", errors="ignore").rstrip("\x00")
+
+            token_metadata[addr] = f"{name} ({symbol})"
+
+        except Exception as e:
+            token_metadata[addr] = np.nan
+            print(f"Could not fetch ERC20 metadata for {addr}: {e}")
+
+    # Map metadata to DataFrame
+    df["contract_name"] = df["address"].map(token_metadata)
 
     return df

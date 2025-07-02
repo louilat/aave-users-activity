@@ -91,7 +91,9 @@ def collect_prices_data(start: datetime, stop: datetime) -> DataFrame:
     return prices
 
 
-def get_user_transactions(alchemy_url, address, from_block, to_block, from_user=True):
+def get_user_transactions(
+    alchemy_api_key, address, from_block, to_block, from_user=True
+):
     """
     Retrieves and processes all asset transfers received by an address between two block numbers.
 
@@ -134,7 +136,11 @@ def get_user_transactions(alchemy_url, address, from_block, to_block, from_user=
     }
 
     headers = {"Content-Type": "application/json"}
-    response = requests.post(alchemy_url, data=json.dumps(payload), headers=headers)
+    response = requests.post(
+        f"https://eth-mainnet.g.alchemy.com/v2/{alchemy_api_key}",
+        data=json.dumps(payload),
+        headers=headers,
+    )
 
     if not response.ok:
         print(f"Error for {address}: {response.status_code}")
@@ -183,7 +189,7 @@ def get_user_transactions(alchemy_url, address, from_block, to_block, from_user=
     return tx
 
 
-def extract_user_transactions(df, alchemy_url):
+def extract_user_transactions(df, alchemy_api_key):
     """
     Extracts and enriches sent and received transactions for a list of users.
 
@@ -200,66 +206,52 @@ def extract_user_transactions(df, alchemy_url):
     Returns:
         pd.DataFrame: A combined DataFrame with enriched transactions sorted by block number.
     """
-    tx = []
     all_sent = []
     all_received = []
 
     for row in df.itertuples(index=False):
         # Retrieve sent and received transactions
         tx_sent = get_user_transactions(
-            alchemy_url=alchemy_url,
+            alchemy_api_key=alchemy_api_key,
             address=row.user,
             from_block=row.Borrow_blockNumber,
             to_block=row.Last_Repay_blockNumber,
             from_user=True,
         )
         tx_received = get_user_transactions(
-            alchemy_url=alchemy_url,
+            alchemy_api_key=alchemy_api_key,
             address=row.user,
             from_block=row.Borrow_blockNumber,
             to_block=row.Last_Repay_blockNumber,
             from_user=False,
         )
-
-        # Store user transactions along with metadata
-        tx.append(
-            {
-                "user": row.user,
-                "Borrowed_Asset": row.Reserve,
-                "Borrow_Amount": row.Borrow_Amount,
-                "Borrow_Amount_USD": row.Borrow_underlyingEventPriceUSD,
-                "First_Repay_Amount": row.First_Repay_Amount,
-                "First_Repay_blockNumber": row.First_Repay_blockNumber,
-                "sent": tx_sent.to_dict(orient="records"),
-                "received": tx_received.to_dict(orient="records"),
-            }
-        )
-
-    # Flatten and enrich the transactions
-    for entry in tx:
-        for sent in entry["sent"]:
+        # Enrich sent transactions
+        sent_records = tx_sent.to_dict(orient="records")
+        for sent in sent_records:
             sent.update(
                 {
-                    "user": entry["user"],
-                    "Borrowed_Asset": entry["Borrowed_Asset"],
-                    "Borrow_Amount": entry["Borrow_Amount"],
-                    "Borrow_Amount_USD": entry["Borrow_Amount_USD"],
-                    "First_Repay_Amount": entry["First_Repay_Amount"],
-                    "First_Repay_blockNumber": entry["First_Repay_blockNumber"],
+                    "user": row.user,
+                    "Borrowed_Asset": row.Reserve,
+                    "Borrow_Amount": row.Borrow_Amount,
+                    "Borrow_Amount_USD": row.Borrow_underlyingEventPriceUSD,
+                    "First_Repay_Amount": row.First_Repay_Amount,
+                    "First_Repay_blockNumber": row.First_Repay_blockNumber,
                     "direction": "sent",
                 }
             )
             all_sent.append(sent)
 
-        for received in entry["received"]:
+        # Enrich received transactions
+        received_records = tx_received.to_dict(orient="records")
+        for received in received_records:
             received.update(
                 {
-                    "user": entry["user"],
-                    "Borrowed_Asset": entry["Borrowed_Asset"],
-                    "Borrow_Amount": entry["Borrow_Amount"],
-                    "Borrow_Amount_USD": entry["Borrow_Amount_USD"],
-                    "First_Repay_Amount": entry["First_Repay_Amount"],
-                    "First_Repay_blockNumber": entry["First_Repay_blockNumber"],
+                    "user": row.user,
+                    "Borrowed_Asset": row.Reserve,
+                    "Borrow_Amount": row.Borrow_Amount,
+                    "Borrow_Amount_USD": row.Borrow_underlyingEventPriceUSD,
+                    "First_Repay_Amount": row.First_Repay_Amount,
+                    "First_Repay_blockNumber": row.First_Repay_blockNumber,
                     "direction": "received",
                 }
             )
