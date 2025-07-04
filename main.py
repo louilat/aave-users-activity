@@ -1,4 +1,5 @@
 # Main ETL
+import pandas as pd
 import boto3
 import json
 from datetime import datetime
@@ -48,9 +49,11 @@ data = client_s3.get_object(
 )["Body"].read()
 blocks_timestamps = json.loads(data)
 
+blocksTimestamps = pd.DataFrame(blocks_timestamps)
+
 df = add_timestamp(
     df=df,
-    blocksTimestamps=blocks_timestamps,
+    blocksTimestamps=blocksTimestamps,
     col_blockNumber_borrow="Borrow_blockNumber",
     col_day_borrow="Borrow_Day",
     col_blockNumber_first="First_Repay_blockNumber",

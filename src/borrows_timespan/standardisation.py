@@ -294,14 +294,6 @@ def add_timestamp(
     df : pd.DataFrame
         The input DataFrame with the new timestamp columns added where specified.
     """
-
-    # Load JSON containing block -> timestamp mapping
-    with open(blocksTimestamps, mode) as file:
-        blocksTimestamps = json.load(file)
-
-    # Convert JSON to DataFrame
-    blocksTimestamps = pd.DataFrame(blocksTimestamps)
-
     # Convert Unix timestamps to pandas datetime
     blocksTimestamps[col_timestamp] = pd.to_datetime(
         blocksTimestamps[col_timestamp], unit="s"
