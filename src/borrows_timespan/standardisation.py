@@ -2,7 +2,6 @@
 import pandas as pd
 from datetime import timedelta
 import numpy as np
-import json
 from web3 import Web3
 from hexbytes import HexBytes
 
@@ -249,7 +248,7 @@ def rescaling_repay(
 
 def add_timestamp(
     df,
-    blocksTimestamps="blocksTimestamps.json",
+    blocksTimestamps,
     mode="r",
     col_timestamp="timestamp",
     col_blockNumber_timestamp="blockNumber",

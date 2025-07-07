@@ -150,8 +150,8 @@ def repayment(
                         f"{prefix}_Repay_underlyingEventPriceUSD": repay_event_price[
                             index_repay
                         ],
-                        f"Time_to_{prefix}_Repay": repay_day[index_repay]
-                        - borrow_day[index_borrow],
+                        f"Time_to_{prefix}_Repay": pd.to_datetime(repay_day[j])
+                        - pd.to_datetime(borrow_day[i]),
                     }
                 )
                 break  # Stop once the first match is found

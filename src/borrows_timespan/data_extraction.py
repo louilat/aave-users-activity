@@ -212,14 +212,14 @@ def extract_user_transactions(df, alchemy_api_key):
     for row in df.itertuples(index=False):
         # Retrieve sent and received transactions
         tx_sent = get_user_transactions(
-            alchemy_api_key=alchemy_api_key,
+            alchemy_api_key,
             address=row.user,
             from_block=row.Borrow_blockNumber,
             to_block=row.Last_Repay_blockNumber,
             from_user=True,
         )
         tx_received = get_user_transactions(
-            alchemy_api_key=alchemy_api_key,
+            alchemy_api_key,
             address=row.user,
             from_block=row.Borrow_blockNumber,
             to_block=row.Last_Repay_blockNumber,
@@ -234,8 +234,8 @@ def extract_user_transactions(df, alchemy_api_key):
                     "Borrowed_Asset": row.Reserve,
                     "Borrow_Amount": row.Borrow_Amount,
                     "Borrow_Amount_USD": row.Borrow_underlyingEventPriceUSD,
-                    "First_Repay_Amount": row.First_Repay_Amount,
-                    "First_Repay_blockNumber": row.First_Repay_blockNumber,
+                    "Last_Repay_Amount": row.Last_Repay_Amount,
+                    "Last_Repay_blockNumber": row.Last_Repay_blockNumber,
                     "direction": "sent",
                 }
             )
@@ -250,8 +250,8 @@ def extract_user_transactions(df, alchemy_api_key):
                     "Borrowed_Asset": row.Reserve,
                     "Borrow_Amount": row.Borrow_Amount,
                     "Borrow_Amount_USD": row.Borrow_underlyingEventPriceUSD,
-                    "First_Repay_Amount": row.First_Repay_Amount,
-                    "First_Repay_blockNumber": row.First_Repay_blockNumber,
+                    "Last_Repay_Amount": row.Last_Repay_Amount,
+                    "Last_Repay_blockNumber": row.Last_Repay_blockNumber,
                     "direction": "received",
                 }
             )
@@ -261,17 +261,26 @@ def extract_user_transactions(df, alchemy_api_key):
     df_tx = pd.DataFrame(all_sent + all_received)
 
     # Reorder columns to put key fields in front
-    cols = df_tx.columns.tolist()
-    for col in [
-        "First_Repay_blockNumber",
-        "First_Repay_Amount",
-        "Borrow_Amount_USD",
-        "Borrow_Amount",
-        "Borrowed_Asset",
+    cols = [
         "user",
-    ]:
-        if col in cols:
-            cols.insert(0, cols.pop(cols.index(col)))
+        "Borrowed_Asset",
+        "Borrow_Amount",
+        "Borrow_Amount_USD",
+        "Last_Repay_Amount",
+        "Last_Repay_blockNumber",
+        "event_id",
+        "tx_hash",
+        "blockNumber",
+        "from",
+        "to",
+        "reserve",
+        "asset",
+        "value",
+        "decimals",
+        "category",
+        "timestamp",
+        "direction",
+    ]
     df_tx = df_tx[cols]
 
     # Sort and clean

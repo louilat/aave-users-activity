@@ -45,7 +45,7 @@ client_s3 = boto3.client(
 
 data = client_s3.get_object(
     Bucket="arnaudbrrt",
-    Key=f"/diffusion/aave_user_activity/blocksTimestamps.json",
+    Key="/diffusion/aave_user_activity/blocksTimestamps.json",
 )["Body"].read()
 blocks_timestamps = json.loads(data)
 
