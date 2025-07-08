@@ -9,12 +9,8 @@ from src.borrows_timespan.timespan_functions import (
 )
 from src.borrows_timespan.standardisation import (
     add_timestamp,
-    classify_addresses,
-    fetch_erc20_metadata,
 )
-from src.borrows_timespan.data_extraction import (
-    extract_user_transactions,
-)
+
 
 # Inputs
 YOUR_ACCESS_KEY = "INPUT_YOUR_ACCESS_KEY"
@@ -61,11 +57,5 @@ df = add_timestamp(
     col_blockNumber_last="Last_Repay_blockNumber",
     col_day_last="Last_Repay_Day",
 )
-
-df = extract_user_transactions(df=df, alchemy_api_key=KEY)
-
-df = classify_addresses(df=df, alchemy_api_key=KEY)
-
-df = fetch_erc20_metadata(df=df, alchemy_api_key=KEY)
 
 df.to_csv("data/df_tx.csv", index=False)
