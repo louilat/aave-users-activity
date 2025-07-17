@@ -22,7 +22,8 @@ def repayment(
     first_repay=True,
     col_amount="amount",
     col_cumsum="Cumsum_amount",
-    col_user="onBehalfOf",
+    col_onBehalf="onBehalfOf",
+    col_repayer="repayer",
     col_asset="reserve_name",
     col_day="day",
     col_block="blockNumber",
@@ -72,7 +73,7 @@ def repayment(
     if df_repay_user.empty:
         return pd.DataFrame(
             {
-                "user": df_borrow_user[col_user].values,
+                "user": df_borrow_user[col_onBehalf].values,
                 "Reserve": df_borrow_user[col_asset].values,
                 "Borrow_Day": df_borrow_user[col_day].values,
                 "Borrow_blockNumber": df_borrow_user[col_block].values,
@@ -81,6 +82,7 @@ def repayment(
                 "Borrow_underlyingEventPriceUSD": df_borrow_user[
                     col_event_price
                 ].values,
+                f"{prefix}_Repayer": [pd.NaT] * len(df_borrow_user),
                 f"{prefix}_Repay_Day": [pd.NaT] * len(df_borrow_user),
                 f"{prefix}_Repay_blockNumber": [np.nan] * len(df_borrow_user),
                 f"{prefix}_Repay_Amount": [np.nan] * len(df_borrow_user),
@@ -95,6 +97,7 @@ def repayment(
     results = []
 
     # Extract repayment columns as NumPy arrays for efficiency
+    repayer = df_repay_user[col_repayer].values
     repay_cumsum = df_repay_user[col_cumsum].values
     repay_day = df_repay_user[col_day].values
     repay_block = df_repay_user[col_block].values
@@ -107,49 +110,41 @@ def repayment(
     borrow_amount = df_borrow_user[col_amount].values
     borrow_day = df_borrow_user[col_day].values
     borrow_block = df_borrow_user[col_block].values
-    borrow_user = df_borrow_user[col_user].values
+    borrow_user = df_borrow_user[col_onBehalf].values
     borrow_asset = df_borrow_user[col_asset].values
     borrow_price = df_borrow_user[col_price].values
     borrow_event_price = df_borrow_user[col_event_price].values
 
     # Loop through each borrow transaction
-    for index_borrow in range(len(df_borrow_user)):
+    for i in range(len(df_borrow_user)):
         # Define the repayment threshold based on first/last setting
         threshold = (
             0
-            if index_borrow == 0 and first_repay
-            else borrow_cumsum[index_borrow - 1]
+            if i == 0 and first_repay
+            else borrow_cumsum[i - 1]
             if first_repay
-            else borrow_cumsum[index_borrow]
+            else borrow_cumsum[i]
         )
 
         # Search for the repayment that matches the threshold
-        for index_repay in range(len(df_repay_user)):
-            if (
-                repay_block[index_repay] >= borrow_block[index_borrow]
-                and repay_cumsum[index_repay] > threshold
-            ):
+        for j in range(len(df_repay_user)):
+            if repay_block[j] >= borrow_block[i] and repay_cumsum[j] > threshold:
                 # Match found: append enriched borrow-repay pair
                 results.append(
                     {
-                        "user": borrow_user[index_borrow],
-                        "Reserve": borrow_asset[index_borrow],
-                        "Borrow_Day": borrow_day[index_borrow],
-                        "Borrow_blockNumber": borrow_block[index_borrow],
-                        "Borrow_Amount": borrow_amount[index_borrow],
-                        "Borrow_underlyingTokenPriceUSD": borrow_price[index_borrow],
-                        "Borrow_underlyingEventPriceUSD": borrow_event_price[
-                            index_borrow
-                        ],
-                        f"{prefix}_Repay_Day": repay_day[index_repay],
-                        f"{prefix}_Repay_blockNumber": repay_block[index_repay],
-                        f"{prefix}_Repay_Amount": repay_amount[index_repay],
-                        f"{prefix}_Repay_underlyingTokenPriceUSD": repay_price[
-                            index_repay
-                        ],
-                        f"{prefix}_Repay_underlyingEventPriceUSD": repay_event_price[
-                            index_repay
-                        ],
+                        "user": borrow_user[i],
+                        "Reserve": borrow_asset[i],
+                        "Borrow_Day": borrow_day[i],
+                        "Borrow_blockNumber": borrow_block[i],
+                        "Borrow_Amount": borrow_amount[i],
+                        "Borrow_underlyingTokenPriceUSD": borrow_price[i],
+                        "Borrow_underlyingEventPriceUSD": borrow_event_price[i],
+                        f"{prefix}_Repayer": repayer[j],
+                        f"{prefix}_Repay_Day": repay_day[j],
+                        f"{prefix}_Repay_blockNumber": repay_block[j],
+                        f"{prefix}_Repay_Amount": repay_amount[j],
+                        f"{prefix}_Repay_underlyingTokenPriceUSD": repay_price[j],
+                        f"{prefix}_Repay_underlyingEventPriceUSD": repay_event_price[j],
                         f"Time_to_{prefix}_Repay": pd.to_datetime(repay_day[j])
                         - pd.to_datetime(borrow_day[i]),
                     }
@@ -159,13 +154,14 @@ def repayment(
             # No repayment match found: fill with NaNs
             results.append(
                 {
-                    "user": borrow_user[index_borrow],
-                    "Reserve": borrow_asset[index_borrow],
-                    "Borrow_Day": borrow_day[index_borrow],
-                    "Borrow_blockNumber": borrow_block[index_borrow],
-                    "Borrow_Amount": borrow_amount[index_borrow],
-                    "Borrow_underlyingTokenPriceUSD": borrow_price[index_borrow],
-                    "Borrow_underlyingEventPriceUSD": borrow_event_price[index_borrow],
+                    "user": borrow_user[i],
+                    "Reserve": borrow_asset[i],
+                    "Borrow_Day": borrow_day[i],
+                    "Borrow_blockNumber": borrow_block[i],
+                    "Borrow_Amount": borrow_amount[i],
+                    "Borrow_underlyingTokenPriceUSD": borrow_price[i],
+                    "Borrow_underlyingEventPriceUSD": borrow_event_price[i],
+                    f"{prefix}_Repayer": np.nan,
                     f"{prefix}_Repay_Day": pd.NaT,
                     f"{prefix}_Repay_blockNumber": np.nan,
                     f"{prefix}_Repay_Amount": np.nan,
@@ -183,7 +179,8 @@ def first_last_repayment(
     df_repay_user,
     col_amount="amount",
     col_cumsum="Cumsum_amount",
-    col_user="onBehalfOf",
+    col_onBehalf="onBehalfOf",
+    col_repayer="repayer",
     col_asset="reserve_name",
     col_day="day",
     col_block="blockNumber",
@@ -235,7 +232,8 @@ def first_last_repayment(
         first_repay=True,
         col_amount=col_amount,
         col_cumsum=col_cumsum,
-        col_user=col_user,
+        col_onBehalf=col_onBehalf,
+        col_repayer=col_repayer,
         col_asset=col_asset,
         col_day=col_day,
         col_block=col_block,
@@ -250,7 +248,8 @@ def first_last_repayment(
         first_repay=False,
         col_amount=col_amount,
         col_cumsum=col_cumsum,
-        col_user=col_user,
+        col_onBehalf=col_onBehalf,
+        col_repayer=col_repayer,
         col_asset=col_asset,
         col_day=col_day,
         col_block=col_block,
@@ -272,6 +271,7 @@ def first_last_repayment(
 
     # Define columns from the last repayment to merge
     cols_last = [
+        "Last_Repayer",
         "Last_Repay_Day",
         "Last_Repay_blockNumber",
         "Last_Repay_Amount",
@@ -304,8 +304,9 @@ def first_last_repayments_by_user(
     df_repay,
     user,
     col_amount="amount",
-    col_user_borrow="onBehalfOf",
-    col_user_repay="user",
+    col_user="user",
+    col_onBehalf="onBehalfOf",
+    col_repayer="repayer",
     col_asset="reserve_name",
     col_day="day",
     col_block="blockNumber",
@@ -347,9 +348,13 @@ def first_last_repayments_by_user(
     """
 
     # Filter borrow and repay data for the specified user
-    borrow = df_borrow[df_borrow[col_user_borrow] == user].copy()
-    repay = df_repay[df_repay[col_user_repay] == user].copy()
+    borrow = df_borrow[
+        (df_borrow[col_onBehalf] == user) & (df_borrow[col_user] == user)
+    ].copy()
+    repay = df_repay[(df_repay[col_user] == user)].copy()
 
+    if borrow.empty:
+        return
     # List unique borrowed assets
     assets = borrow[col_asset].unique()
     all_results = []
@@ -359,7 +364,7 @@ def first_last_repayments_by_user(
         # Filter borrow transactions for that asset
         df_borrow_user = borrow[borrow[col_asset] == asset][
             [
-                col_user_borrow,
+                col_onBehalf,
                 col_day,
                 col_asset,
                 col_amount,
@@ -374,7 +379,8 @@ def first_last_repayments_by_user(
         # Filter repayment transactions for that asset
         df_repay_user = repay[repay[col_asset] == asset][
             [
-                col_user_repay,
+                col_user,
+                col_repayer,
                 col_day,
                 col_asset,
                 col_amount,
@@ -392,7 +398,8 @@ def first_last_repayments_by_user(
             df_repay_user,
             col_amount,
             "Cumsum_amount",
-            col_user_borrow,
+            col_onBehalf,
+            col_repayer,
             col_asset,
             col_day,
             col_block,
@@ -411,8 +418,9 @@ def all_first_last_repayments(
     df_borrow,
     df_repay,
     col_amount="amount",
+    col_user="user",
     col_user_borrow="onBehalfOf",
-    col_user_repay="user",
+    col_repayer="repayer",
     col_asset="reserve_name",
     col_day="day",
     col_block="blockNumber",
@@ -462,7 +470,7 @@ def all_first_last_repayments(
     all_df = []
 
     # Process each user individually
-    for i, user in enumerate(users, start=1):
+    for i, user in enumerate(users[:50], start=1):
         print(f"Processing user {i} out of {len(users)} : {user}")
 
         # Get repayment match for that user
@@ -470,16 +478,16 @@ def all_first_last_repayments(
             df_borrow,
             df_repay,
             user,
-            col_amount,
-            col_user_borrow,
-            col_user_repay,
-            col_asset,
-            col_day,
-            col_block,
-            col_price,
-            col_event_price,
+            col_amount=col_amount,
+            col_user=col_user,
+            col_onBehalf=col_user_borrow,
+            col_repayer=col_repayer,
+            col_asset=col_asset,
+            col_day=col_day,
+            col_block=col_block,
+            col_price=col_price,
+            col_event_price=col_event_price,
         )
-
         # Collect the result
         all_df.append(df_user)
 
@@ -492,10 +500,7 @@ def all_first_last_repayments(
         "First_Repay_blockNumber",
         "Last_Repay_blockNumber",
     ]:
-        if col in df_all.columns:
-            df_all[col] = df_all[col].astype(
-                "Int64"
-            )  # use pandas nullable integer type
+        df_all[col] = df_all[col].astype("Int64")
 
     return df_all
 
