@@ -470,7 +470,7 @@ def all_first_last_repayments(
     all_df = []
 
     # Process each user individually
-    for i, user in enumerate(users[:50], start=1):
+    for i, user in enumerate(users, start=1):
         print(f"Processing user {i} out of {len(users)} : {user}")
 
         # Get repayment match for that user
